@@ -5,7 +5,7 @@ This is where you do your work.
 Not only do you need to fill in the methods but you can also add any other classes, 
 methods or functions to this file to make your system pass all of the tests.
 
-@author: YOUR UPI
+@author: rdcu001
 '''
 
 from drive import Drive
@@ -59,7 +59,7 @@ class Volume(object):
         First block of root directory (called root_index) : as a string terminated with "\n" - always the last
             block on the drive.
     '''
-
+    
     @staticmethod
     def format(drive, name):
         '''
@@ -71,39 +71,71 @@ class Volume(object):
         one block for a file.
         Returns the volume.
         '''
-        pass
+        if name is None or name == b'' or name == '':#check length of name
+            raise ValueError("Invalid Name")
+        if b'\n' in name:
+            raise ValueError("Name cannot contain \"\n\"")
+        if len(name) >drive.BLK_SIZE*(drive.num_blocks()-2):
+            raise ValueError("")
+        volBlockCount=1
+        
+        vol = Volume()
+        vol.setName(name)
+        vol.setSize(drive.num_blocks())
+        vol.setDrive(drive)
+        vol.set_data_blocks(volBlockCount)
+        return vol
     
     def name(self):
         '''
         Returns the volumes name.
         '''
-        pass
+        return self.fname
+    
+    def setName(self,name):
+        self.fname=name
+        
+    def setSize(self,size):
+        self.fsize= size
+        
+    def setDrive(self,drive):
+        self.driveObj=drive
+        
+    def set_data_blocks(self,datablocks):
+        self.data_blocks=datablocks
+    
     
     def volume_data_blocks(self):
         '''
         Returns the number of blocks at the beginning of the drive which are used to hold
         the volume information.
         '''
-        pass
+        return self.data_blocks
         
     def size(self):
         '''
         Returns the number of blocks in the underlying drive.
         '''
-        pass
+        return self.fsize
     
     def bitmap(self):
         '''
         Returns the volume block bitmap.
         '''
-        pass
+        bitmap =b''
+        for i in range(self.fsize):
+            if len(self.driveObj.read_block(i).strip()) != 0:
+                bitmap = bitmap+b'x'
+            else:
+                bitmap = bitmap+b'-'
+        return bitmap
     
     def root_index(self):
         '''
         Returns the block number of the first block of the root directory.
         Always the last block on the drive.
         '''
-        pass
+        return self.fsize-1
     
     @staticmethod
     def mount(drive_name):
@@ -112,13 +144,23 @@ class Volume(object):
         Any data on the drive is preserved.
         Returns the volume.
         '''
-        pass
+        drive = Drive.reconnect(drive_name)
+        vol = Volume
+        
+        block = drive.read_block(0).split(b'\n')
+        #gotta account for multiple blocks of info
+        vol.setName(block[1])
+        vol.setSize(int(block[2]))
+        vol.setDrive(drive)
+        vol.set_data_blocks(block[0])
+        return vol
     
     def unmount(self):
         '''
         Unmounts the volume and disconnects the drive.
         '''
-        pass
+        driveObj.disconnect()
+        driveObj = None
     
     def open(self, filename):
         '''
