@@ -23,13 +23,15 @@ class A2File(object):
         Volume.open method.
         You can use as many parameters as you need.
         '''
-        pass
+        self.fsize = 0
+        self.content = b''
+        self.filename = params
 
     def size(self):
         '''
         Returns the size of the file in bytes.
         '''
-        pass
+        return self.fsize
 
     def write(self, location, data):
         '''
@@ -37,7 +39,17 @@ class A2File(object):
         If location is greater than the size of the file the file is extended
         to the location with spaces.
         '''
-        pass
+        count = 0
+        for i in range(location+len(data)):
+            if i > len(self.content) and i<location:
+                self.content+=b' '
+            elif i>len(self.content) and i>=location:
+                if count<len(data):
+                    self.content+=data[count]
+                    count+=1
+            elif i<len(self.content) and i>=location:
+                self.content[i] = data[count]
+                count+=1
 
     def read(self, location, amount):
         '''
@@ -46,7 +58,9 @@ class A2File(object):
         location to (location + amount - 1) is outside the range of the file.
         Areas within the range of the file return spaces if they have not been written to.
         '''
-        pass
+        if (location+amount-1)>len(self.content):
+            raise IOError()
+        return self.content[location:]
 
 class Volume(object):
     '''
@@ -253,4 +267,6 @@ class Volume(object):
         If the file does not exist it is created.
         Returns an A2File object.
         '''
-        pass
+        if b'\n' in filename:
+            raise ValueError()
+        return A2File(filename)
