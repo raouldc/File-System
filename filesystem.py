@@ -177,14 +177,31 @@ class Volume(object):
         Returns the volume.
         '''
         drive = Drive.reconnect(drive_name)
-        vol = Volume
+        vol = Volume()
 
         block = drive.read_block(0).split(b'\n')
-        #gotta account for multiple blocks of info
-        vol.setName(block[1])
-        vol.setSize(int(block[2]))
+        volinfosize= int(bytes.decode(block[0]))
+        nameArr = []
+        nameArr.append(block[1])
+        if volinfosize!=1:
+            for i in range (1,volinfosize-1):
+                nameArr.append(drive.read_block(0).split(b'\n')[0])
+            block = drive.read_block(volinfosize-1).split(b'\n')
+        vol.setName(nameArr)
+        vol.setSize(int(bytes.decode(block[2])))
         vol.setDrive(drive)
-        vol.set_data_blocks(block[0])
+        vol.set_data_blocks(int(bytes.decode(block[0])))
+        
+        bmpArr =[]
+        
+        bmp = bytes.decode(block[3])
+
+        for i,v in enumerate(bmp):
+            if v == 'x':
+                bmpArr.append(1)
+            else:
+                bmpArr.append(0)
+        vol.setBitmapArray(bmpArr)
         return vol
 
     def unmount(self):
