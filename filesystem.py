@@ -60,7 +60,7 @@ class A2File(object):
         '''
         if (location+amount-1)>len(self.content):
             raise IOError()
-        return self.content[location:]
+        return self.content[location:location+amount]
 
 class Volume(object):
     '''
@@ -245,6 +245,11 @@ class Volume(object):
 
     def setVolInfo(self,volInfo):
         self.volInfo = volInfo
+
+    def findNextFreeBlock(self):
+        for i,v in enumerate(self.fbmpArray):
+            if v ==0:
+                return i
 
     def open(self, filename):
         '''
