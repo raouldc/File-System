@@ -7,6 +7,8 @@ methods or functions to this file to make your system pass all of the tests.
 
 @author: rdcu001
 '''
+from array import array
+from math import ceil
 
 from drive import Drive
 
@@ -80,7 +82,20 @@ class Volume(object):
         volBlockCount=1
 
         vol = Volume()
-        vol.setName(name)
+
+        nameArr =[]
+        if len(name)>62:
+            temp = ceil(len(name)/62)
+            a=0
+            b=62
+            for i in range(temp):
+                nameArr.append(name[a:b])
+                a+=64
+                b+=64
+        else:
+            nameArr.append(name)
+
+        vol.setName(nameArr)
         vol.setSize(drive.num_blocks())
         vol.setDrive(drive)
         if volBlockCount ==1:
@@ -98,7 +113,10 @@ class Volume(object):
         '''
         Returns the volumes name.
         '''
-        return self.fname
+        name =b''
+        for i,v in enumerate(self.fname):
+            name += v
+        return name
 
     def setName(self,name):
         self.fname=name
@@ -137,9 +155,9 @@ class Volume(object):
 
         for i, v in enumerate(self.fbmpArray):
             if v == 1:
-                bitmap = bitmap+b'x'
+                bitmap += b'x'
             else:
-                bitmap = bitmap+b'-'
+                bitmap += b'-'
 
 
         return bitmap
@@ -173,8 +191,44 @@ class Volume(object):
         '''
         Unmounts the volume and disconnects the drive.
         '''
+
+
+        for i, v in enumerate(self.fbmpArray):
+            if v == 1:
+                if i == 0:
+                    self.writevolinfo()
+                elif i == self.root_index():
+                    self.writeroot(self.root_index())
+                else:
+                    #write file
+                    pass
         self.driveObj.disconnect()
         self.driveObj = None
+
+    def writevolinfo(self):
+        #write number of blocks occupied by the volume information
+        block =b""+bytearray(str(self.volume_data_blocks()),'utf-8')+b'\n'
+        #write the rest of the volume information
+        block = block + self.fname[0]+b'\n'
+        if len(self.fname)!=1:
+            self.driveObj.write_block(0,block)
+            block = b''
+            for i in range(1,len(self.fname)):
+                block = block + self.fname[i]
+                if i !=len(self.fname)-1:
+                    self.driveObj.write_block(i,block)
+        block+=bytearray(str(self.fsize),'utf-8')+b'\n'
+        block+=self.bitmap()+b'\n'
+        block+=bytearray(str(self.root_index()),'utf-8')+b'\n'
+        while len(block)<64:
+            block+=b' '
+        self.driveObj.write_block(0,block)
+
+    def writeroot(self,ind):
+        block = b''
+        for i in range(16):
+            block = block + b'  0\n'
+        self.driveObj.write_block(ind,block)
 
     def open(self, filename):
         '''
