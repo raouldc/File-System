@@ -2,7 +2,7 @@
 Created on 27/08/2013
 
 This is where you do your work.
-Not only do you need to fill in the methods but you can also add any other classes, 
+Not only do you need to fill in the methods but you can also add any other classes,
 methods or functions to this file to make your system pass all of the tests.
 
 @author: rdcu001
@@ -14,7 +14,7 @@ class A2File(object):
     '''
     One of these gets returned from Volume open.
     '''
-    
+
     def __init__(self, params):
         '''
         Initializes an A2File object.
@@ -23,21 +23,21 @@ class A2File(object):
         You can use as many parameters as you need.
         '''
         pass
-    
+
     def size(self):
         '''
         Returns the size of the file in bytes.
         '''
         pass
-    
+
     def write(self, location, data):
         '''
         Writes data to a file at a specific byte location.
         If location is greater than the size of the file the file is extended
-        to the location with spaces. 
+        to the location with spaces.
         '''
         pass
-    
+
     def read(self, location, amount):
         '''
         Reads from a file at a specific byte location.
@@ -59,7 +59,7 @@ class Volume(object):
         First block of root directory (called root_index) : as a string terminated with "\n" - always the last
             block on the drive.
     '''
-    
+
     @staticmethod
     def format(drive, name):
         '''
@@ -78,65 +78,79 @@ class Volume(object):
         if len(name) >drive.BLK_SIZE*(drive.num_blocks()-2):
             raise ValueError("")
         volBlockCount=1
-        
+
         vol = Volume()
         vol.setName(name)
         vol.setSize(drive.num_blocks())
         vol.setDrive(drive)
+        if volBlockCount ==1:
+            #assuming that there is 1 block at the end for the root directory
+            #and the volume info is in one block
+            bmpArray = [1]
+            for i in range(drive.num_blocks()-2):
+                bmpArray.append(0)
+            bmpArray.append(1)
+            vol.setBitmapArray(bmpArray)
         vol.set_data_blocks(volBlockCount)
         return vol
-    
+
     def name(self):
         '''
         Returns the volumes name.
         '''
         return self.fname
-    
+
     def setName(self,name):
         self.fname=name
-        
+
     def setSize(self,size):
         self.fsize= size
-        
+
     def setDrive(self,drive):
         self.driveObj=drive
-        
+
     def set_data_blocks(self,datablocks):
         self.data_blocks=datablocks
-    
-    
+
+
     def volume_data_blocks(self):
         '''
         Returns the number of blocks at the beginning of the drive which are used to hold
         the volume information.
         '''
         return self.data_blocks
-        
+
     def size(self):
         '''
         Returns the number of blocks in the underlying drive.
         '''
         return self.fsize
-    
+
+    def setBitmapArray(self,b):
+        self.fbmpArray = b
+
     def bitmap(self):
         '''
         Returns the volume block bitmap.
         '''
         bitmap =b''
-        for i in range(self.fsize):
-            if len(self.driveObj.read_block(i).strip()) != 0:
+
+        for i, v in enumerate(self.fbmpArray):
+            if v == 1:
                 bitmap = bitmap+b'x'
             else:
                 bitmap = bitmap+b'-'
+
+
         return bitmap
-    
+
     def root_index(self):
         '''
         Returns the block number of the first block of the root directory.
         Always the last block on the drive.
         '''
         return self.fsize-1
-    
+
     @staticmethod
     def mount(drive_name):
         '''
@@ -146,7 +160,7 @@ class Volume(object):
         '''
         drive = Drive.reconnect(drive_name)
         vol = Volume
-        
+
         block = drive.read_block(0).split(b'\n')
         #gotta account for multiple blocks of info
         vol.setName(block[1])
@@ -154,14 +168,14 @@ class Volume(object):
         vol.setDrive(drive)
         vol.set_data_blocks(block[0])
         return vol
-    
+
     def unmount(self):
         '''
         Unmounts the volume and disconnects the drive.
         '''
-        driveObj.disconnect()
-        driveObj = None
-    
+        self.driveObj.disconnect()
+        self.driveObj = None
+
     def open(self, filename):
         '''
         Opens a file for read and write operations.
