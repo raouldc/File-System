@@ -1,0 +1,32 @@
+issues need to be fixed:
+
+multiple blocks for volume info(partially done)
+check that there is space for the bitmap shit
+
+
+multiple blocks for root directory
+
+modify unmount to write multiple blocks for root directory
+
+
+File psuedo code
+first num +1
+if file size > 64
+	temp = ceil(size/64)
+	split into array of 64
+check which block to allocate to
+first ensure that 
+for each file:
+	totalsize +=filename+size+blocksize
+if > 64
+	then split into multiple blocks, starting from num+1
+	set bmparray value accordingly
+
+now in the next free slot
+	mark "this" slot as filled
+	repeat until file is written:
+		find next empty block
+		write data in that block
+		mark "that" block as filled in parent slot directory
+		pad with 0's
+repeat for all the files
