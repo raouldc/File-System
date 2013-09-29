@@ -252,6 +252,6 @@ class Volume(object):
         If the file does not exist it is created.
         Returns an A2File object.
         '''
-        if b'\n' in filename:
+        if b'\n' in filename or b'/' in filename:
             raise ValueError()
         return A2File(filename)
