@@ -7,7 +7,6 @@ methods or functions to this file to make your system pass all of the tests.
 
 @author: rdcu001
 '''
-from array import array
 from math import ceil
 
 from drive import Drive
@@ -85,12 +84,12 @@ class Volume(object):
 
         nameArr =[]
         if len(name)>62:
-            temp = ceil(len(name)/62)
+            volBlockCount = ceil(len(name)/62)
             a=0
             b=62
-            for i in range(temp):
+            for i in range(volBlockCount):
                 nameArr.append(name[a:b])
-                a+=64
+                a=b
                 b+=64
         else:
             nameArr.append(name)
@@ -98,14 +97,15 @@ class Volume(object):
         vol.setName(nameArr)
         vol.setSize(drive.num_blocks())
         vol.setDrive(drive)
-        if volBlockCount ==1:
-            #assuming that there is 1 block at the end for the root directory
-            #and the volume info is in one block
-            bmpArray = [1]
-            for i in range(drive.num_blocks()-2):
-                bmpArray.append(0)
+        #assuming that there is 1 block at the end for the root directory
+        #and the volume info is in one block
+        bmpArray=[]
+        for i in range(volBlockCount):
             bmpArray.append(1)
-            vol.setBitmapArray(bmpArray)
+        for i in range(drive.num_blocks()-1-volBlockCount):
+            bmpArray.append(0)
+        bmpArray.append(1)
+        vol.setBitmapArray(bmpArray)
         vol.set_data_blocks(volBlockCount)
         return vol
 
@@ -209,20 +209,20 @@ class Volume(object):
         #write number of blocks occupied by the volume information
         block =b""+bytearray(str(self.volume_data_blocks()),'utf-8')+b'\n'
         #write the rest of the volume information
-        block = block + self.fname[0]+b'\n'
+        block = block + self.fname[0]
         if len(self.fname)!=1:
             self.driveObj.write_block(0,block)
-            block = b''
             for i in range(1,len(self.fname)):
+                block = b''
                 block = block + self.fname[i]
                 if i !=len(self.fname)-1:
                     self.driveObj.write_block(i,block)
-        block+=bytearray(str(self.fsize),'utf-8')+b'\n'
+        block+=b'\n'+bytearray(str(self.fsize),'utf-8')+b'\n'
         block+=self.bitmap()+b'\n'
         block+=bytearray(str(self.root_index()),'utf-8')+b'\n'
         while len(block)<64:
             block+=b' '
-        self.driveObj.write_block(0,block)
+        self.driveObj.write_block(len(self.fname)-1,block)
 
     def writeroot(self,ind):
         block = b''
