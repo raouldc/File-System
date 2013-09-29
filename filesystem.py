@@ -23,7 +23,6 @@ class A2File(object):
         Volume.open method.
         You can use as many parameters as you need.
         '''
-        self.fsize = 0
         self.content = b''
         self.filename = params
 
@@ -31,7 +30,7 @@ class A2File(object):
         '''
         Returns the size of the file in bytes.
         '''
-        return self.fsize
+        return len(self.content)
 
     def write(self, location, data):
         '''
@@ -39,17 +38,18 @@ class A2File(object):
         If location is greater than the size of the file the file is extended
         to the location with spaces.
         '''
-        count = 0
-        for i in range(location+len(data)):
-            if i > len(self.content) and i<location:
+        count = 1
+
+
+        for i in range(location+len(data)+1):
+            if i >= len(self.content) and i<location:
                 self.content+=b' '
             elif i>len(self.content) and i>=location:
-                if count<len(data):
-                    self.content+=data[count]
+                if count<=len(data):
+                    self.content+=data[count-1:count]
                     count+=1
             elif i<len(self.content) and i>=location:
-                self.content[i] = data[count]
-                count+=1
+                self.content = self.content[:i]+data[count-1:count]#+self.content[i+1+len(data):]
 
     def read(self, location, amount):
         '''
@@ -96,23 +96,18 @@ class Volume(object):
 
         vol = Volume()
 
-        nameArr =[]
-        if len(name)>62:
-            volBlockCount = ceil(len(name)/62)
-            a=0
-            b=62
-            for i in range(volBlockCount):
-                nameArr.append(name[a:b])
-                a=b
-                b+=64
+        volInfo =name+b'\n'+bytearray(str(drive.num_blocks()),'utf-8')+b'\n'+b'0'*drive.num_blocks()+b'\n'+bytearray(str(drive.num_blocks()-1),'utf-8')+b'\n'
+        if len(volInfo)>62:
+            volBlockCount = ceil(len(volInfo)/64)
+            volInfo = bytearray(str(volBlockCount),'utf-8')+b'\n' + volInfo
+            if len(volInfo)>64:
+                volBlockCount = ceil(len(volInfo)/64)
         else:
-            nameArr.append(name)
-
-        vol.setName(nameArr)
+            volInfo = b'1\n'+volInfo
+        vol.setVolInfo(volInfo)
         vol.setSize(drive.num_blocks())
         vol.setDrive(drive)
         #assuming that there is 1 block at the end for the root directory
-        #and the volume info is in one block
         bmpArray=[]
         for i in range(volBlockCount):
             bmpArray.append(1)
@@ -120,20 +115,14 @@ class Volume(object):
             bmpArray.append(0)
         bmpArray.append(1)
         vol.setBitmapArray(bmpArray)
-        vol.set_data_blocks(volBlockCount)
         return vol
 
     def name(self):
         '''
         Returns the volumes name.
         '''
-        name =b''
-        for i,v in enumerate(self.fname):
-            name += v
-        return name
+        return self.volInfo.split(b'\n')[1]
 
-    def setName(self,name):
-        self.fname=name
 
     def setSize(self,size):
         self.fsize= size
@@ -141,16 +130,17 @@ class Volume(object):
     def setDrive(self,drive):
         self.driveObj=drive
 
-    def set_data_blocks(self,datablocks):
-        self.data_blocks=datablocks
-
-
     def volume_data_blocks(self):
         '''
         Returns the number of blocks at the beginning of the drive which are used to hold
         the volume information.
         '''
-        return self.data_blocks
+        temp = self.volInfo.split(b'\n')[0]
+        if type(temp) is bytes:
+            return int(bytes.decode(temp))
+        else:
+            return int(bytearray.decode(temp))
+
 
     def size(self):
         '''
@@ -166,14 +156,11 @@ class Volume(object):
         Returns the volume block bitmap.
         '''
         bitmap =b''
-
         for i, v in enumerate(self.fbmpArray):
             if v == 1:
                 bitmap += b'x'
             else:
                 bitmap += b'-'
-
-
         return bitmap
 
     def root_index(self):
@@ -195,26 +182,24 @@ class Volume(object):
 
         block = drive.read_block(0).split(b'\n')
         volinfosize= int(bytes.decode(block[0]))
-        nameArr = []
-        nameArr.append(block[1])
+        volinfo =b''
+        volinfo+=drive.read_block(0)
         if volinfosize!=1:
-            for i in range (1,volinfosize-1):
-                nameArr.append(drive.read_block(0).split(b'\n')[0])
-            block = drive.read_block(volinfosize-1).split(b'\n')
-        vol.setName(nameArr)
+            for i in range (1,volinfosize+1):
+                volinfo+=drive.read_block(i)
         vol.setSize(int(bytes.decode(block[2])))
         vol.setDrive(drive)
-        vol.set_data_blocks(int(bytes.decode(block[0])))
-        
+
         bmpArr =[]
         
-        bmp = bytes.decode(block[3])
+        bmp = bytes.decode(volinfo.split(b'\n')[3])
 
         for i,v in enumerate(bmp):
             if v == 'x':
                 bmpArr.append(1)
             else:
                 bmpArr.append(0)
+        vol.setVolInfo(volinfo)
         vol.setBitmapArray(bmpArr)
         return vol
 
@@ -222,8 +207,6 @@ class Volume(object):
         '''
         Unmounts the volume and disconnects the drive.
         '''
-
-
         for i, v in enumerate(self.fbmpArray):
             if v == 1:
                 if i == 0:
@@ -237,29 +220,31 @@ class Volume(object):
         self.driveObj = None
 
     def writevolinfo(self):
-        #write number of blocks occupied by the volume information
-        block =b""+bytearray(str(self.volume_data_blocks()),'utf-8')+b'\n'
-        #write the rest of the volume information
-        block = block + self.fname[0]
-        if len(self.fname)!=1:
-            self.driveObj.write_block(0,block)
-            for i in range(1,len(self.fname)):
-                block = b''
-                block = block + self.fname[i]
-                if i !=len(self.fname)-1:
-                    self.driveObj.write_block(i,block)
-        block+=b'\n'+bytearray(str(self.fsize),'utf-8')+b'\n'
-        block+=self.bitmap()+b'\n'
-        block+=bytearray(str(self.root_index()),'utf-8')+b'\n'
-        while len(block)<64:
-            block+=b' '
-        self.driveObj.write_block(len(self.fname)-1,block)
+        volTemp = self.volInfo.split(b'\n')
+        self.volInfo =b''
+        for i,v in enumerate(volTemp):
+            if i==3:
+                self.volInfo+=self.bitmap()+b'\n'
+            else:
+                self.volInfo+=v+b'\n'
+        a = 0
+        b = 64
+        for i in range(self.volume_data_blocks()):
+            temp = self.volInfo[a:b]
+            while len(temp)<64:
+                temp+=b' '
+            self.driveObj.write_block(i,temp)
+            a = b
+            b+=64
 
     def writeroot(self,ind):
         block = b''
         for i in range(16):
             block = block + b'  0\n'
         self.driveObj.write_block(ind,block)
+
+    def setVolInfo(self,volInfo):
+        self.volInfo = volInfo
 
     def open(self, filename):
         '''
